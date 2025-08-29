@@ -1,234 +1,223 @@
-import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { FlatList, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuthStore } from '../../stores/authStore';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { Button, Input } from '@/components/ui';
-import { Card } from '@/components/ui/Card';
+interface FoodItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  distance: string;
+  timeLeft: string;
+  image?: string;
+  isUrgent: boolean;
+}
+
+// Mock data for food listings
+const mockFoodItems: FoodItem[] = [
+  {
+    id: '1',
+    title: 'Fresh Vegetables Bundle',
+    description: 'Carrots, broccoli, and bell peppers from our garden',
+    category: 'Vegetables',
+    distance: '0.3 km',
+    timeLeft: '2 hours',
+    isUrgent: true,
+  },
+  {
+    id: '2',
+    title: 'Homemade Bread Loaves',
+    description: 'Whole wheat and sourdough, baked this morning',
+    category: 'Bakery',
+    distance: '0.8 km',
+    timeLeft: '1 day',
+    isUrgent: false,
+  },
+  {
+    id: '3',
+    title: 'Fruit Salad Mix',
+    description: 'Apples, oranges, and bananas - perfect for smoothies',
+    category: 'Fruits',
+    distance: '1.2 km',
+    timeLeft: '6 hours',
+    isUrgent: false,
+  },
+];
 
 export default function HomeScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
-  const [emailError, setEmailError] = useState('');
+  const { user } = useAuthStore();
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const validateEmail = (text: string) => {
-    setEmail(text);
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (text && !emailRegex.test(text)) {
-      setEmailError('Please enter a valid email address');
-    } else {
-      setEmailError('');
-    }
+  const handleItemPress = (itemId: string) => {
+    // TODO: Navigate to listing details when route is created
+    console.log('Navigate to listing:', itemId);
   };
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
 
-      {/* Button Component Test */}
-      <View className="bg-cream-white dark:bg-gray-900 p-4 rounded-2xl shadow-lg mb-4">
-        <Text className="text-forest-green text-xl font-bold mb-4 text-center">
-          🌱 Button Component Library
-        </Text>
+  const handleCategoryPress = (category: string) => {
+    router.push(`/explore?category=${category}`);
+  };
 
-        {/* Button Variants */}
-        <View className="space-y-3 mb-4">
-          <Button title="Primary Button" variant="primary" onPress={() => console.log('Primary pressed')} />
-          <Button title="Secondary Button" variant="secondary" onPress={() => console.log('Secondary pressed')} />
-          <Button title="Outline Button" variant="outline" onPress={() => console.log('Outline pressed')} />
-          <Button title="Ghost Button" variant="ghost" onPress={() => console.log('Ghost pressed')} />
-        </View>
-
-        {/* Button Sizes */}
-        <View className="space-y-3 mb-4">
-          <Button title="Small Button" size="small" onPress={() => console.log('Small pressed')} />
-          <Button title="Medium Button" size="medium" onPress={() => console.log('Medium pressed')} />
-          <Button title="Large Button" size="large" onPress={() => console.log('Large pressed')} />
-        </View>
-
-        {/* Button States */}
-        <View className="space-y-3">
-          <Button title="Loading Button" loading onPress={() => console.log('Loading pressed')} />
-          <Button title="Disabled Button" disabled onPress={() => console.log('Disabled pressed')} />
-        </View>
+  const renderFoodItem = ({ item }: { item: FoodItem }) => (
+    <TouchableOpacity
+      className="flex-row p-4 bg-white rounded-xl border border-gray-200 mb-3 active:bg-gray-50"
+      onPress={() => handleItemPress(item.id)}
+    >
+      <View className="w-15 h-15 bg-forest-green/20 rounded-lg items-center justify-center mr-3">
+        <Ionicons name="restaurant" size={32} color="#2D5016" />
       </View>
-
-      {/* Card Component Test */}
-      <View className="space-y-4 mb-4">
-        <Text className="text-forest-green text-xl font-bold text-center">
-          🃏 Card Component Library
+      <View className="flex-1">
+        <View className="flex-row justify-between items-center mb-1">
+          <Text className="text-base font-semibold text-gray-900 flex-1" numberOfLines={1}>
+            {item.title}
+          </Text>
+          {item.isUrgent && (
+            <View className="bg-red-500 px-2 py-1 rounded ml-2">
+              <Text className="text-white text-xs font-semibold">
+                Urgent
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text className="text-sm text-gray-600 leading-5 mb-2" numberOfLines={2}>
+          {item.description}
         </Text>
-
-        {/* Default Card */}
-        <Card variant="default" padding="medium">
-          <Text className="text-forest-green text-lg font-semibold mb-2">
-            Default Card
-          </Text>
-          <Text className="text-sage-green">
-            This is a default card with medium padding and standard shadow.
-          </Text>
-        </Card>
-
-        {/* Glassmorphism Card */}
-        <Card variant="glassmorphism" padding="large">
-          <Text className="text-forest-green text-lg font-semibold mb-2">
-            Glassmorphism Card
-          </Text>
-          <Text className="text-sage-green">
-            This card features a beautiful glassmorphism effect with blur and transparency.
-          </Text>
-        </Card>
-
-        {/* Elevated Interactive Card */}
-        <Card 
-          variant="elevated" 
-          padding="medium" 
-          interactive
-          onPress={() => console.log('Card pressed!')}
-        >
-          <Text className="text-forest-green text-lg font-semibold mb-2">
-            Interactive Elevated Card
-          </Text>
-          <Text className="text-sage-green">
-            This card is interactive with press animations and elevated shadow. Tap me!
-          </Text>
-        </Card>
-
-        {/* Small Padding Card */}
-        <Card variant="default" padding="small">
-          <Text className="text-forest-green font-semibold">
-            Small Padding Card
-          </Text>
-        </Card>
-      </View>
-
-      {/* Input Component Test */}
-      <View className="space-y-4 mb-4">
-        <Text className="text-forest-green text-xl font-bold text-center">
-          📝 Input Component Library
-        </Text>
-
-        <Card variant="default" padding="large">
-          <View className="space-y-4">
-            {/* Basic Text Input */}
-            <Input
-              label="Full Name"
-              placeholder="Enter your full name"
-              value={name}
-              onChangeText={setName}
-              leftIcon="person"
-              success={name.length > 2}
-            />
-
-            {/* Email Input with Validation */}
-            <Input
-              label="Email Address"
-              placeholder="Enter your email"
-              type="email"
-              value={email}
-              onChangeText={validateEmail}
-              leftIcon="mail"
-              error={emailError}
-              success={email.length > 0 && !emailError}
-            />
-
-            {/* Password Input */}
-            <Input
-              label="Password"
-              placeholder="Enter your password"
-              type="password"
-              value={password}
-              onChangeText={setPassword}
-              leftIcon="lock-closed"
-              success={password.length >= 8}
-            />
-
-            {/* Phone Input */}
-            <Input
-              label="Phone Number"
-              placeholder="Enter your phone number"
-              type="phone"
-              value={phone}
-              onChangeText={setPhone}
-              leftIcon="call"
-              rightIcon="checkmark-circle"
-              success={phone.length > 0}
-            />
-
-            {/* Input with Error */}
-            <Input
-              label="Required Field"
-              placeholder="This field has an error"
-              error="This field is required"
-              leftIcon="alert-circle"
-            />
+        <View className="flex-row justify-between items-center">
+          <View className="flex-row items-center">
+            <Ionicons name="location-outline" size={14} color="#6B7280" />
+            <Text className="text-xs text-gray-500 mr-2">
+              {item.distance}
+            </Text>
+            <Ionicons name="time-outline" size={14} color="#6B7280" />
+            <Text className="text-xs text-gray-500 mr-2">
+              {item.timeLeft}
+            </Text>
           </View>
-        </Card>
+          <Text className="text-xs font-medium text-forest-green bg-forest-green/10 px-2 py-1 rounded">
+            {item.category}
+          </Text>
+        </View>
       </View>
-    </ParallaxScrollView>
+    </TouchableOpacity>
+  );
+
+  return (
+    <ScrollView className="flex-1 bg-cream-white">
+      {/* Header */}
+      <View className="pt-4 px-5 pb-5 bg-white">
+        <View className="flex-row justify-between items-center mb-5">
+          <View>
+            <Text className="text-base text-gray-500">
+              Good morning,
+            </Text>
+            <Text className="text-2xl font-bold text-gray-900">
+              {user?.displayName || 'User'}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            className="w-11 h-11 bg-cream-white rounded-full items-center justify-center relative"
+            onPress={() => console.log('Navigate to notifications')}
+          >
+            <Ionicons name="notifications-outline" size={24} color="#1F2937" />
+            <View className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+          </TouchableOpacity>
+        </View>
+        {/* Search Bar */}
+        <View className="flex-row items-center px-4 py-3 bg-cream-white border border-gray-200 rounded-xl gap-3">
+          <Ionicons name="search" size={20} color="#6B7280" />
+          <TextInput
+            className="flex-1 text-base text-gray-900"
+            placeholder="Search for food near you..."
+            placeholderTextColor="#6B7280"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <TouchableOpacity onPress={() => router.push('/explore')}>
+            <Ionicons name="options-outline" size={20} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Quick Stats */}
+      <View className="p-5 mt-2 bg-white">
+        <Text className="text-lg font-semibold text-gray-900 mb-4">
+          Today&apos;s Impact
+        </Text>
+        <View className="flex-row justify-between">
+          <View className="items-center">
+            <Text className="text-xl font-bold text-green-600">24</Text>
+            <Text className="text-xs text-gray-500 mt-1">Items Available</Text>
+          </View>
+          <View className="items-center">
+            <Text className="text-xl font-bold text-forest-green">1.2km</Text>
+            <Text className="text-xs text-gray-500 mt-1">Avg Distance</Text>
+          </View>
+          <View className="items-center">
+            <Text className="text-xl font-bold text-warm-orange">8</Text>
+            <Text className="text-xs text-gray-500 mt-1">Urgent Items</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Categories */}
+      <View className="py-5 mt-2 bg-white">
+        <Text className="text-lg font-semibold text-gray-900 mb-4 px-5">
+          Categories
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-5">
+          {['Vegetables', 'Fruits', 'Bakery', 'Dairy', 'Prepared', 'Other'].map((category) => (
+            <TouchableOpacity
+              key={category}
+              className="items-center py-4 px-5 mr-3 bg-cream-white border border-gray-200 rounded-xl min-w-[80px] active:bg-gray-50"
+              onPress={() => handleCategoryPress(category)}
+            >
+              <Ionicons 
+                name={getCategoryIcon(category)} 
+                size={24} 
+                color="#2D5016" 
+              />
+              <Text className="text-xs font-medium text-gray-900 mt-2">
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Nearby Food */}
+      <View className="p-5 mt-2 bg-white">
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-lg font-semibold text-gray-900">
+            Nearby Food
+          </Text>
+          <TouchableOpacity onPress={() => router.push('/explore')}>
+            <Text className="text-sm font-semibold text-forest-green">
+              See All
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={mockFoodItems}
+          renderItem={renderFoodItem}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+function getCategoryIcon(category: string): any {
+  const icons: { [key: string]: string } = {
+    'Vegetables': 'leaf-outline',
+    'Fruits': 'nutrition-outline',
+    'Bakery': 'cafe-outline',
+    'Dairy': 'water-outline',
+    'Prepared': 'restaurant-outline',
+    'Other': 'ellipsis-horizontal-outline',
+  };
+  return icons[category] || 'ellipsis-horizontal-outline';
+}
+

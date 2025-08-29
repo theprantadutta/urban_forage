@@ -72,10 +72,10 @@ export const useSignUp = () => {
     mutationFn: async (data: SignUpData) => {
       setLoading(true);
       setError(null);
-      const result = await authService.signUp({ 
-        email: data.email, 
-        password: data.password, 
-        displayName: data.displayName 
+      const result = await authService.signUp({
+        email: data.email,
+        password: data.password,
+        displayName: data.displayName
       });
       if (result.error) {
         throw new Error(result.error);
@@ -172,7 +172,7 @@ export const useAppleSignIn = () => {
 // Mutation: Complete profile setup (placeholder)
 export const useCompleteProfileSetup = () => {
   const queryClient = useQueryClient();
-  const { setUser, setProfileSetupCompleted, setLoading, setError } = useAuthStore();
+  const { setProfileSetupCompleted, setLoading, setError } = useAuthStore();
 
   const mutation = useMutation({
     mutationFn: async (data: ProfileSetupData) => {
@@ -243,7 +243,7 @@ export const useSignOut = () => {
     onSuccess: () => {
       signOut();
       setLoading(false);
-      
+
       // Clear all cached data
       queryClient.clear();
     },
@@ -273,7 +273,7 @@ export const useDeleteAccount = () => {
     onSuccess: () => {
       signOut();
       setLoading(false);
-      
+
       // Clear all cached data
       queryClient.clear();
     },

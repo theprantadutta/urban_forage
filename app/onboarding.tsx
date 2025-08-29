@@ -1,13 +1,15 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React from 'react';
 import { OnboardingScreen } from '../components/onboarding';
+import { useAuthStore } from '../stores/authStore';
 
 export default function OnboardingPage() {
+  const { setOnboardingCompleted } = useAuthStore();
+
   const handleComplete = async () => {
     try {
-      // Mark onboarding as completed
-      await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+      // Mark onboarding as completed in Zustand store
+      setOnboardingCompleted(true);
       // Navigate to sign-in screen after onboarding
       router.replace('/auth/signin' as any);
     } catch (error) {
@@ -19,7 +21,7 @@ export default function OnboardingPage() {
   const handleSkip = async () => {
     try {
       // Mark onboarding as completed even when skipped
-      await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+      setOnboardingCompleted(true);
       // Navigate to sign-in screen when skipped
       router.replace('/auth/signin' as any);
     } catch (error) {

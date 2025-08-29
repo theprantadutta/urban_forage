@@ -68,9 +68,19 @@ class UserProfileService {
           joinedAt: new Date(),
           verified: false,
         },
-        location: profileData.location,
-        photoURL: profileData.photoURL || generateAvatarURL(profileData.displayName),
       };
+
+      // Only add location if it exists
+      if (profileData.location) {
+        updates.location = profileData.location;
+      }
+
+      // Only add photoURL if it exists, otherwise use generated avatar
+      if (profileData.photoURL) {
+        updates.photoURL = profileData.photoURL;
+      } else {
+        updates.photoURL = generateAvatarURL(profileData.displayName);
+      }
 
       return await this.updateProfile(userId, updates);
     } catch (error) {

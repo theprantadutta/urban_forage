@@ -21,13 +21,13 @@ export interface UserProfile {
   id: string;
   email: string;
   displayName: string;
-  photoURL?: string;
-  phoneNumber?: string;
+  photoURL?: string | null;
+  phoneNumber?: string | null;
   location?: {
     latitude: number;
     longitude: number;
     address: string;
-  };
+  } | null;
   preferences: {
     notifications: boolean;
     darkMode: boolean;
@@ -170,8 +170,6 @@ class AuthService {
       id: firebaseUser.uid,
       email: firebaseUser.email!,
       displayName: additionalData?.displayName || firebaseUser.displayName || 'Anonymous User',
-      photoURL: firebaseUser.photoURL || undefined,
-      phoneNumber: firebaseUser.phoneNumber || undefined,
       preferences: {
         notifications: true,
         darkMode: false,
@@ -189,6 +187,15 @@ class AuthService {
         communityRating: 0,
       },
     };
+
+    // Only add optional fields if they have values
+    if (firebaseUser.photoURL) {
+      userProfile.photoURL = firebaseUser.photoURL;
+    }
+    
+    if (firebaseUser.phoneNumber) {
+      userProfile.phoneNumber = firebaseUser.phoneNumber;
+    }
 
     // Save to Firestore
     await setDoc(doc(firestore, 'users', firebaseUser.uid), userProfile);

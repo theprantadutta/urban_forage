@@ -2,13 +2,13 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
-  photoURL?: string;
-  phoneNumber?: string;
+  photoURL?: string | null;
+  phoneNumber?: string | null;
   location?: {
     latitude: number;
     longitude: number;
     address: string;
-  };
+  } | null;
   preferences: {
     notifications: boolean;
     darkMode: boolean;
@@ -69,6 +69,11 @@ export interface ProfileSetupData {
     latitude: number;
     longitude: number;
     address: string;
-  };
-  photoURL?: string;
+  } | null;
+  photoURL?: string | null;
+}
+
+export interface AuthError extends Error {
+  code?: string;
+  message: string;
 }

@@ -1,7 +1,8 @@
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { auth } from '../config/firebase';
 import { authService } from '../services/auth';
+import { useAuthStore } from '../stores/authStore';
 import { AuthCredentials, AuthResult, SocialProvider, User } from '../types/auth';
 
 interface UseAuthReturn {
@@ -18,13 +19,21 @@ interface UseAuthReturn {
 }
 
 export const useAuth = (): UseAuthReturn => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    user,
+    isLoading,
+    error,
+    isAuthenticated,
+    setUser,
+    setLoading,
+    setError,
+    clearError: clearStoreError,
+    signOut: signOutStore,
+  } = useAuthStore();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      setIsLoading(true);
+      setLoading(true);
       
       if (firebaseUser) {
         try {
@@ -40,14 +49,14 @@ export const useAuth = (): UseAuthReturn => {
         setUser(null);
       }
       
-      setIsLoading(false);
+      setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [setUser, setLoading, setError]);
 
   const signUp = async (credentials: AuthCredentials): Promise<AuthResult> => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     
     try {
@@ -65,12 +74,12 @@ export const useAuth = (): UseAuthReturn => {
       setError(errorMessage);
       return { user: null, error: errorMessage };
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const signIn = async (credentials: Omit<AuthCredentials, 'displayName'>): Promise<AuthResult> => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     
     try {
@@ -88,12 +97,12 @@ export const useAuth = (): UseAuthReturn => {
       setError(errorMessage);
       return { user: null, error: errorMessage };
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const signOut = async (): Promise<void> => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     
     try {
@@ -102,17 +111,17 @@ export const useAuth = (): UseAuthReturn => {
       if (result.error) {
         setError(result.error);
       } else {
-        setUser(null);
+        signOutStore();
       }
     } catch (err) {
       setError('An unexpected error occurred during sign out');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const signInWithSocial = async (provider: SocialProvider): Promise<AuthResult> => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     
     try {
@@ -144,7 +153,7 @@ export const useAuth = (): UseAuthReturn => {
       setError(errorMessage);
       return { user: null, error: errorMessage };
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -167,13 +176,13 @@ export const useAuth = (): UseAuthReturn => {
   };
 
   const clearError = (): void => {
-    setError(null);
+    clearStoreError();
   };
 
   return {
     user,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated,
     error,
     signUp,
     signIn,

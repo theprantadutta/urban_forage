@@ -53,7 +53,7 @@ const ProfileSetupForm: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -165,8 +165,8 @@ const ProfileSetupForm: React.FC = () => {
         displayName: displayName.trim(),
         bio: bio.trim(),
         interests: selectedInterests,
-        location: location || undefined,
-        photoURL: photoURL || undefined,
+        location: location || null,
+        photoURL: photoURL || null,
       };
 
       const result = await userProfileService.completeProfileSetup(user.id, profileData);

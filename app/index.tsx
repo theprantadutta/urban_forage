@@ -1,18 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
+import { useAuthStore } from '../stores/authStore';
 
 export default function AppEntry() {
     const [isLoading, setIsLoading] = useState(true);
     const { user } = useAuth();
+    const { hasCompletedOnboarding } = useAuthStore();
 
     const checkAppState = useCallback(async () => {
         try {
-            // Check if user has completed onboarding
-            const hasCompletedOnboarding = await AsyncStorage.getItem('hasCompletedOnboarding');
-
             if (!hasCompletedOnboarding) {
                 // First time user - show onboarding
                 router.replace('/onboarding' as any);
@@ -30,7 +28,7 @@ export default function AppEntry() {
         } finally {
             setIsLoading(false);
         }
-    }, [user]);
+    }, [user, hasCompletedOnboarding]);
 
     useEffect(() => {
         checkAppState();

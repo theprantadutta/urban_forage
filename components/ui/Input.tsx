@@ -33,6 +33,7 @@ export interface InputProps extends Omit<TextInputProps, 'style'> {
   labelStyle?: TextStyle;
   errorStyle?: TextStyle;
   className?: string;
+  disabled?: boolean;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -186,9 +187,17 @@ export const Input: React.FC<InputProps> = ({
       <AnimatedView
         style={[
           containerAnimatedStyle,
-          { borderColor: successColor },
+          { 
+            borderColor: successColor,
+            backgroundColor: '#F5F1E8', // Warm off-white that complements cream-white background
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            minHeight: 48,
+          },
         ]}
-        className="flex-row items-center bg-white dark:bg-gray-800 rounded-xl px-4 py-3 min-h-[48px]"
       >
         {/* Left Icon */}
         {leftIcon && (
@@ -213,12 +222,12 @@ export const Input: React.FC<InputProps> = ({
             {
               flex: 1,
               fontSize: 16,
-              color: '#1F2937', // gray-800
+              color: '#000000', // Force pure black text
+              backgroundColor: 'transparent',
             },
             inputStyle,
           ]}
-          className="text-gray-800 dark:text-white"
-          placeholderTextColor="#9CA3AF" // gray-400
+          placeholderTextColor="#666666" // Darker gray for better visibility
           {...props}
         />
 

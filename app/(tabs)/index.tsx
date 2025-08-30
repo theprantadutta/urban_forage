@@ -61,40 +61,40 @@ export default function HomeScreen() {
 
   const renderFoodItem = ({ item }: { item: FoodItem }) => (
     <TouchableOpacity
-      className="flex-row p-4 bg-white rounded-xl border border-gray-200 mb-3 active:bg-gray-50"
+      className="flex-row items-center p-3 bg-white rounded-xl border border-gray-200 mb-3 active:bg-gray-50"
       onPress={() => handleItemPress(item.id)}
     >
-      <View className="w-15 h-15 bg-forest-green/20 rounded-lg items-center justify-center mr-3">
-        <Ionicons name="restaurant" size={32} color="#2D5016" />
+      <View className="w-12 h-12 bg-forest-green/20 rounded-full items-center justify-center mr-3">
+        <Ionicons name="restaurant" size={20} color="#2D5016" />
       </View>
       <View className="flex-1">
-        <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-base font-semibold text-gray-900 flex-1" numberOfLines={1}>
+        <View className="flex-row justify-between items-start mb-1">
+          <Text className="text-base font-semibold text-gray-900 flex-1 pr-2" numberOfLines={1}>
             {item.title}
           </Text>
           {item.isUrgent && (
-            <View className="bg-red-500 px-2 py-1 rounded ml-2">
+            <View className="bg-red-500 px-2 py-0.5 rounded-full">
               <Text className="text-white text-xs font-semibold">
                 Urgent
               </Text>
             </View>
           )}
         </View>
-        <Text className="text-sm text-gray-600 leading-5 mb-2" numberOfLines={2}>
+        <Text className="text-sm text-gray-600 leading-4 mb-2" numberOfLines={2}>
           {item.description}
         </Text>
         <View className="flex-row justify-between items-center">
           <View className="flex-row items-center">
-            <Ionicons name="location-outline" size={14} color="#6B7280" />
-            <Text className="text-xs text-gray-500 mr-2">
+            <Ionicons name="location-outline" size={12} color="#6B7280" />
+            <Text className="text-xs text-gray-500 mr-3 ml-1">
               {item.distance}
             </Text>
-            <Ionicons name="time-outline" size={14} color="#6B7280" />
-            <Text className="text-xs text-gray-500 mr-2">
+            <Ionicons name="time-outline" size={12} color="#6B7280" />
+            <Text className="text-xs text-gray-500 ml-1">
               {item.timeLeft}
             </Text>
           </View>
-          <Text className="text-xs font-medium text-forest-green bg-forest-green/10 px-2 py-1 rounded">
+          <Text className="text-xs font-medium text-forest-green bg-forest-green/10 px-2 py-1 rounded-full">
             {item.category}
           </Text>
         </View>

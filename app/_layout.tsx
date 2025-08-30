@@ -1,14 +1,14 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../global.css';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { QueryProvider } from '../providers';
+import { ThemedStatusBar } from '../components/ui/ThemedStatusBar';
+import { QueryProvider, ThemeProvider } from '../providers';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -24,8 +24,9 @@ export default function RootLayout() {
   return (
     <QueryProvider>
       <SafeAreaProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
             <Stack
               screenOptions={{
                 headerShown: false,
@@ -89,8 +90,9 @@ export default function RootLayout() {
                 }}
               />
             </Stack>
-            <StatusBar style="light" backgroundColor="#2D5016" />
-          </GestureHandlerRootView>
+            <ThemedStatusBar />
+            </GestureHandlerRootView>
+          </NavigationThemeProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </QueryProvider>

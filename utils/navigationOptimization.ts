@@ -153,7 +153,7 @@ export const MemoryOptimization = {
     
     return (...args: Parameters<T>) => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func(...args), delay);
+      timeoutId = setTimeout(() => func(...args), delay) as any;
     };
   },
 

@@ -1,27 +1,27 @@
 import React, { useEffect, useRef } from 'react';
 import {
-    Image,
-    ImageProps,
-    ScrollView,
-    ScrollViewProps,
-    Switch,
-    SwitchProps,
-    Text,
-    TextInput,
-    TextInputProps,
-    TextProps,
-    TouchableOpacity,
-    TouchableOpacityProps,
-    View,
-    ViewProps,
-    findNodeHandle,
+  Image,
+  ImageProps,
+  ScrollView,
+  ScrollViewProps,
+  Switch,
+  SwitchProps,
+  Text,
+  TextInput,
+  TextInputProps,
+  TextProps,
+  TouchableOpacity,
+  TouchableOpacityProps,
+  View,
+  ViewProps,
+  findNodeHandle,
 } from 'react-native';
 import { useTheme } from '../../providers/ThemeProvider';
 import {
-    AccessibilityHelpers,
-    AccessibilityRoles,
-    buildAccessibilityProps,
-    useAccessibility,
+  AccessibilityHelpers,
+  AccessibilityRoles,
+  buildAccessibilityProps,
+  useAccessibility,
 } from '../../utils/accessibility';
 
 // Accessible Button Component
@@ -44,7 +44,6 @@ export const AccessibleButton: React.FC<AccessibleButtonProps> = ({
   style,
   ...props
 }) => {
-  const { colors } = useTheme();
   const { announceMessage } = useAccessibility();
   const buttonRef = useRef<any>(null);
 

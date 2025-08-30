@@ -166,7 +166,7 @@ export const useDebouncedLoading = (delay: number = 300) => {
 
     timeoutRef.current = setTimeout(() => {
       setShowLoading(true);
-    }, delay);
+    }, delay) as any;
   }, [delay]);
 
   const stopLoading = useCallback(() => {
@@ -212,7 +212,7 @@ export const useLoadingWithTimeout = (timeout: number = 30000) => {
     timeoutRef.current = setTimeout(() => {
       setHasTimedOut(true);
       setIsLoading(false);
-    }, timeout);
+    }, timeout) as any;
   }, [timeout]);
 
   const stopLoading = useCallback(() => {

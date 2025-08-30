@@ -9,14 +9,22 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "UrbanForage needs access to your location to show nearby food listings and help you discover local produce.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "UrbanForage needs access to your location to show nearby food listings and help you discover local produce."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -32,6 +40,13 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "UrbanForage needs access to your location to show nearby food listings and help you discover local produce.",
+          "locationWhenInUsePermission": "UrbanForage needs access to your location to show nearby food listings and help you discover local produce."
         }
       ]
     ],

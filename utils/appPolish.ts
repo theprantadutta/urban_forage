@@ -188,7 +188,7 @@ export const performanceHelpers = {
     let timeout: NodeJS.Timeout;
     return (...args: Parameters<T>) => {
       clearTimeout(timeout);
-      timeout = setTimeout(() => func(...args), wait);
+      timeout = setTimeout(() => func(...args), wait) as any;
     };
   },
 

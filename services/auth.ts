@@ -8,7 +8,7 @@ import {
     updateProfile
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, firestore } from '../config/firebase';
+import { auth, db as firestore } from '../config/firebase';
 
 // Types
 export interface AuthCredentials {

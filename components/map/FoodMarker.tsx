@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import { Marker } from 'react-native-maps';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 
 export interface FoodListing {
   id: string;
@@ -91,23 +92,26 @@ export const FoodMarker: React.FC<FoodMarkerProps> = ({
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
+  const { isReduceMotionEnabled, announceMessage } = useAccessibility();
 
-  // Bounce animation when marker is first rendered
+  // Bounce animation when marker is first rendered (respect reduce motion)
   useEffect(() => {
-    Animated.sequence([
-      Animated.timing(bounceAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.spring(bounceAnim, {
-        toValue: 0,
-        friction: 4,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [bounceAnim]);
+    if (!isReduceMotionEnabled) {
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(bounceAnim, {
+          toValue: 0,
+          friction: 4,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [bounceAnim, isReduceMotionEnabled]);
 
   // Selection animation
   useEffect(() => {

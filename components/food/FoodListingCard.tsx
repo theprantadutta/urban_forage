@@ -1,8 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import React, { useRef, useState } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
+import {
+  ACCESSIBILITY_ROLES,
+  accessibleHapticFeedback,
+  createAccessibilityHint,
+  getFoodListingAccessibilityLabel
+} from '../../utils/accessibility';
+import { ProgressiveImage } from '../common';
 import type { FoodListing } from '../map/FoodMarker';
 import { AvailabilityIndicator } from './AvailabilityIndicator';
 import { RatingDisplay } from './RatingDisplay';
@@ -26,6 +32,7 @@ export const FoodListingCard: React.FC<FoodListingCardProps> = ({
 }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const { isScreenReaderEnabled, announceMessage, isReduceMotionEnabled } = useAccessibility();
   
   // Animation refs
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -41,106 +48,119 @@ export const FoodListingCard: React.FC<FoodListingCardProps> = ({
   ).current;
 
   // Animate card press
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const handlePress = async () => {
+    await accessibleHapticFeedback('impact');
     
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    if (isScreenReaderEnabled) {
+      announceMessage(`Opening details for ${listing.title}`);
+    }
     
-    onPress?.(listing);
-  };
-
-  // Animate favorite button with particles
-  const handleFavoritePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    if (!isFavorite) {
-      // Heart animation
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(heartScaleAnim, {
-            toValue: 1.3,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-          Animated.timing(heartScaleAnim, {
-            toValue: 1,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(heartRotateAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        heartRotateAnim.setValue(0);
-      });
-
-      // Particle explosion animation
-      const particleAnimations = particleAnims.map((particle, index) => {
-        const angle = (index * 60) * Math.PI / 180; // 60 degrees apart
-        const distance = 30;
-        
-        return Animated.parallel([
-          Animated.timing(particle.scale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(particle.translateX, {
-            toValue: Math.cos(angle) * distance,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(particle.translateY, {
-            toValue: Math.sin(angle) * distance,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(particle.opacity, {
-            toValue: 0,
-            duration: 400,
-            delay: 200,
-            useNativeDriver: true,
-          }),
-        ]);
-      });
-
-      Animated.parallel(particleAnimations).start(() => {
-        // Reset particles
-        particleAnims.forEach(particle => {
-          particle.scale.setValue(0);
-          particle.translateX.setValue(0);
-          particle.translateY.setValue(0);
-          particle.opacity.setValue(1);
-        });
-      });
-    } else {
-      // Simple scale animation for unfavorite
+    if (!isReduceMotionEnabled) {
       Animated.sequence([
-        Animated.timing(heartScaleAnim, {
-          toValue: 0.8,
+        Animated.timing(scaleAnim, {
+          toValue: 0.95,
           duration: 100,
           useNativeDriver: true,
         }),
-        Animated.timing(heartScaleAnim, {
+        Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 100,
           useNativeDriver: true,
         }),
       ]).start();
+    }
+    
+    onPress?.(listing);
+  };
+
+  // Animate favorite button with particles
+  const handleFavoritePress = async () => {
+    await accessibleHapticFeedback('selection');
+    
+    const action = isFavorite ? 'Removed from favorites' : 'Added to favorites';
+    if (isScreenReaderEnabled) {
+      announceMessage(`${listing.title} ${action}`);
+    }
+    
+    if (!isReduceMotionEnabled) {
+      if (!isFavorite) {
+        // Heart animation
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(heartScaleAnim, {
+              toValue: 1.3,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+            Animated.timing(heartScaleAnim, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.timing(heartRotateAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          heartRotateAnim.setValue(0);
+        });
+
+        // Particle explosion animation
+        const particleAnimations = particleAnims.map((particle, index) => {
+          const angle = (index * 60) * Math.PI / 180; // 60 degrees apart
+          const distance = 30;
+          
+          return Animated.parallel([
+            Animated.timing(particle.scale, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(particle.translateX, {
+              toValue: Math.cos(angle) * distance,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.timing(particle.translateY, {
+              toValue: Math.sin(angle) * distance,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.timing(particle.opacity, {
+              toValue: 0,
+              duration: 400,
+              delay: 200,
+              useNativeDriver: true,
+            }),
+          ]);
+        });
+
+        Animated.parallel(particleAnimations).start(() => {
+          // Reset particles
+          particleAnims.forEach(particle => {
+            particle.scale.setValue(0);
+            particle.translateX.setValue(0);
+            particle.translateY.setValue(0);
+            particle.opacity.setValue(1);
+          });
+        });
+      } else {
+        // Simple scale animation for unfavorite
+        Animated.sequence([
+          Animated.timing(heartScaleAnim, {
+            toValue: 0.8,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(heartScaleAnim, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
     }
     
     onFavoritePress?.(listing);
@@ -181,32 +201,51 @@ export const FoodListingCard: React.FC<FoodListingCardProps> = ({
     outputRange: ['0deg', '12deg'],
   });
 
+  // Generate comprehensive accessibility label
+  const accessibilityLabel = getFoodListingAccessibilityLabel({
+    title: listing.title,
+    category: listing.category,
+    distance: showDistance ? listing.distance : undefined,
+    availability: listing.availability,
+    timeLeft: listing.timeLeft,
+    isUrgent: listing.isUrgent,
+  });
+
+  const accessibilityHint = createAccessibilityHint(
+    'view details',
+    `Opens detailed information about this ${listing.category} listing`
+  );
+
   return (
     <Animated.View
       style={{
-        transform: [{ scale: scaleAnim }],
+        transform: [{ scale: isReduceMotionEnabled ? 1 : scaleAnim }],
       }}
     >
       <TouchableOpacity
         className={`bg-white rounded-2xl shadow-lg overflow-hidden ${className}`}
         onPress={handlePress}
-        activeOpacity={1}
+        activeOpacity={isReduceMotionEnabled ? 1 : 0.8}
+        accessible={true}
+        accessibilityRole={ACCESSIBILITY_ROLES.BUTTON}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={{
+          selected: false,
+        }}
       >
       {/* Image Container */}
       <View className="relative">
-        <Image
+        <ProgressiveImage
           source={{ uri: listing.image }}
           className="w-full h-48"
           contentFit="cover"
-          transition={300}
-          onLoadStart={() => setImageLoading(true)}
-          onLoadEnd={() => setImageLoading(false)}
+          aspectRatio={4/3}
+          alt={`${listing.title} food listing`}
+          onLoad={() => setImageLoading(false)}
           onError={() => {
             setImageError(true);
             setImageLoading(false);
-          }}
-          placeholder={{
-            blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4',
           }}
         />
 
@@ -230,7 +269,14 @@ export const FoodListingCard: React.FC<FoodListingCardProps> = ({
           <TouchableOpacity
             className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full items-center justify-center shadow-md"
             onPress={handleFavoritePress}
-            activeOpacity={0.8}
+            activeOpacity={isReduceMotionEnabled ? 1 : 0.8}
+            accessible={true}
+            accessibilityRole={ACCESSIBILITY_ROLES.BUTTON}
+            accessibilityLabel={isFavorite ? `Remove ${listing.title} from favorites` : `Add ${listing.title} to favorites`}
+            accessibilityHint={isFavorite ? 'Double tap to remove from favorites' : 'Double tap to add to favorites'}
+            accessibilityState={{
+              selected: isFavorite,
+            }}
           >
             <Animated.View
               style={{
@@ -360,8 +406,12 @@ export const FoodListingCard: React.FC<FoodListingCardProps> = ({
         {/* Action Buttons */}
         <View className="flex-row space-x-3">
           <TouchableOpacity
-            className="flex-1 bg-forest-green px-4 py-3 rounded-full active:bg-forest-green/90 flex-row items-center justify-center"
+            className="flex-1 bg-forest-green px-4 py-3 rounded-full active:bg-forest-green/90 flex-row items-center justify-center min-h-[44px]"
             onPress={handlePress}
+            accessible={true}
+            accessibilityRole={ACCESSIBILITY_ROLES.BUTTON}
+            accessibilityLabel={`View details for ${listing.title}`}
+            accessibilityHint="Opens detailed information about this food listing"
           >
             <Ionicons name="eye-outline" size={16} color="white" />
             <Text className="text-white text-sm font-semibold ml-2">
@@ -370,11 +420,18 @@ export const FoodListingCard: React.FC<FoodListingCardProps> = ({
           </TouchableOpacity>
           
           <TouchableOpacity
-            className="bg-sage-green/20 px-4 py-3 rounded-full active:bg-sage-green/30 flex-row items-center justify-center"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            className="bg-sage-green/20 px-4 py-3 rounded-full active:bg-sage-green/30 flex-row items-center justify-center min-h-[44px]"
+            onPress={async () => {
+              await accessibleHapticFeedback('selection');
+              if (isScreenReaderEnabled) {
+                announceMessage(`Opening message for ${listing.provider}`);
+              }
               // TODO: Implement messaging functionality
             }}
+            accessible={true}
+            accessibilityRole={ACCESSIBILITY_ROLES.BUTTON}
+            accessibilityLabel={`Message ${listing.provider}`}
+            accessibilityHint="Opens messaging to contact the food provider"
           >
             <Ionicons name="chatbubble-outline" size={16} color="#87A96B" />
             <Text className="text-sage-green text-sm font-semibold ml-2">

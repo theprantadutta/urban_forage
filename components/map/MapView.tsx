@@ -1,16 +1,19 @@
 import { useGeofencing } from "@/hooks/useGeofencing";
 import { useLocationService } from "@/hooks/useLocationService";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, View } from "react-native";
+import { Platform, Text, TouchableOpacity, View } from "react-native";
 import MapView, {
-  PROVIDER_DEFAULT,
-  PROVIDER_GOOGLE,
-  Region,
+    PROVIDER_DEFAULT,
+    PROVIDER_GOOGLE,
+    Region,
 } from "react-native-maps";
 import { mockFoodListings } from "../../constants/mockData";
 import { useClustering } from "../../hooks/useClustering";
 import { useMapTheme } from "../../hooks/useMapTheme";
 import { useNavigation as useNavigationHook } from "../../hooks/useNavigation";
+import { ErrorBoundary } from "../common/ErrorBoundary";
+import { NetworkErrorHandler, useNetworkStatus } from "../common/NetworkErrorHandler";
+import { LocationErrorHandler } from "../location/LocationErrorHandler";
 import { LocationPermissionPrompt } from "../location/LocationPermissionPrompt";
 import { LocationStatusIndicator } from "../location/LocationStatusIndicator";
 import { ProximityAlert } from "../location/ProximityAlert";
@@ -19,6 +22,7 @@ import { NavigationPanel } from "../navigation/NavigationPanel";
 import { ThemedText } from "../ThemedText";
 import { ClusterMarker } from "./ClusterMarker";
 import { FoodMarker, type FoodListing } from "./FoodMarker";
+import { MapErrorHandler } from "./MapErrorHandler";
 
 interface CustomMapViewProps {
   onRegionChange?: (region: Region) => void;
@@ -72,6 +76,14 @@ export const CustomMapView: React.FC<CustomMapViewProps> = ({
   const [selectedDestination, setSelectedDestination] = useState<any>(null);
   const [showNavigationModal, setShowNavigationModal] =
     useState<boolean>(false);
+  const [mapError, setMapError] = useState<{
+    type: 'load_failed' | 'render_error' | 'marker_error' | 'timeout';
+    message: string;
+  } | null>(null);
+  const [showListView, setShowListView] = useState(false);
+
+  // Network status
+  const { isOnline } = useNetworkStatus();
 
   const mapRef = useRef<MapView>(null);
   const { mapStyle, theme } = useMapTheme();
@@ -326,6 +338,54 @@ export const CustomMapView: React.FC<CustomMapViewProps> = ({
     }
   };
 
+  // Map error handlers (currently unused but available for future use)
+  // const handleMapError = useCallback((error: any) => {
+  //   console.error('Map error:', error);
+  //   setMapError({
+  //     type: 'load_failed',
+  //     message: 'Failed to load map. Please check your internet connection.',
+  //   });
+  // }, []);
+
+  // const handleMapLoadError = useCallback(() => {
+  //   setMapError({
+  //     type: 'load_failed',
+  //     message: 'Map failed to load. Please try again or switch to list view.',
+  //   });
+  // }, []);
+
+  const handleRetryMap = useCallback(() => {
+    setMapError(null);
+    // Force map re-render by updating key or reloading
+  }, []);
+
+  const handleSwitchToList = useCallback(() => {
+    setShowListView(true);
+    setMapError(null);
+  }, []);
+
+  const handleRefreshData = useCallback(() => {
+    // Refresh food listings data
+    setMapError(null);
+  }, []);
+
+  const handleLocationError = useCallback(async () => {
+    await initializeLocationServices();
+  }, [initializeLocationServices]);
+
+  const handleManualLocationSelect = useCallback((location: { latitude: number; longitude: number; address?: string }) => {
+    const locationState: LocationState = {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+    setLocation(locationState);
+    setLocationPermission(true);
+    setLoading(false);
+    onLocationUpdate?.(location);
+  }, [onLocationUpdate]);
+
   if (loading) {
     return (
       <View
@@ -347,30 +407,76 @@ export const CustomMapView: React.FC<CustomMapViewProps> = ({
     };
 
   return (
-    <View className={className}>
-      <MapView
-        ref={mapRef}
-        provider={
-          Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
-        }
-        style={{ flex: 1 }}
-        customMapStyle={mapStyle}
-        initialRegion={region}
-        onRegionChangeComplete={handleRegionChange}
-        showsUserLocation={showUserLocation && hasPermission}
-        showsMyLocationButton={true}
-        showsCompass={true}
-        rotateEnabled={true}
-        scrollEnabled={true}
-        zoomEnabled={true}
-        pitchEnabled={true}
-        loadingEnabled={true}
-        loadingIndicatorColor={theme === "dark" ? "#87A96B" : "#2D5016"}
-        loadingBackgroundColor={theme === "dark" ? "#1a1a1a" : "#FDF6E3"}
-        moveOnMarkerPress={false}
-        showsBuildings={true}
-        showsTraffic={false}
-      >
+    <ErrorBoundary
+      enableRetry={true}
+      onError={(error, errorInfo) => {
+        console.error('MapView Error Boundary:', error, errorInfo);
+      }}
+    >
+      <View className={className}>
+        {/* Network Error Handler */}
+        {!isOnline && (
+          <NetworkErrorHandler
+            onRetry={async () => {
+              // Retry loading map data
+              await initializeLocationServices();
+            }}
+            onOfflineMode={() => {
+              setShowListView(true);
+            }}
+            className="absolute top-4 left-4 right-4 z-50"
+          />
+        )}
+
+        {/* Location Error Handler */}
+        {locationError && (
+          <LocationErrorHandler
+            error={locationError}
+            onRetry={handleLocationError}
+            onManualLocationSelect={handleManualLocationSelect}
+            onDismiss={() => setShowPermissionPrompt(false)}
+            className="absolute top-4 left-4 right-4 z-40"
+          />
+        )}
+
+        {/* Map Error Handler */}
+        {mapError && (
+          <MapErrorHandler
+            error={mapError}
+            listings={foodListings}
+            onRetry={handleRetryMap}
+            onSwitchToList={handleSwitchToList}
+            onRefreshData={handleRefreshData}
+            className="absolute inset-4 z-30"
+          />
+        )}
+
+        {/* Map View */}
+        {!showListView && !mapError && (
+          <MapView
+            ref={mapRef}
+            provider={
+              Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
+            }
+            style={{ flex: 1 }}
+            customMapStyle={mapStyle}
+            initialRegion={region}
+            onRegionChangeComplete={handleRegionChange}
+            onMapReady={() => setLoading(false)}
+            showsUserLocation={showUserLocation && hasPermission}
+            showsMyLocationButton={true}
+            showsCompass={true}
+            rotateEnabled={true}
+            scrollEnabled={true}
+            zoomEnabled={true}
+            pitchEnabled={true}
+            loadingEnabled={true}
+            loadingIndicatorColor={theme === "dark" ? "#87A96B" : "#2D5016"}
+            loadingBackgroundColor={theme === "dark" ? "#1a1a1a" : "#FDF6E3"}
+            moveOnMarkerPress={false}
+            showsBuildings={true}
+            showsTraffic={false}
+          >
         {/* Render markers based on clustering state */}
         {enableClustering ? (
           <>
@@ -421,7 +527,28 @@ export const CustomMapView: React.FC<CustomMapViewProps> = ({
             />
           ))
         )}
-      </MapView>
+          </MapView>
+        )}
+
+        {/* List View Fallback */}
+        {showListView && (
+          <View className="flex-1 bg-cream-white dark:bg-gray-900 p-4">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-xl font-bold text-gray-900 dark:text-white">
+                Food Listings
+              </Text>
+              <TouchableOpacity
+                className="bg-forest-green px-4 py-2 rounded-xl active:scale-95"
+                onPress={() => setShowListView(false)}
+              >
+                <Text className="text-white font-medium text-sm">
+                  Back to Map
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {/* Add FlatList for food listings here */}
+          </View>
+        )}
 
       {/* Location Status Indicator */}
       {enableLocationTracking && (
@@ -485,7 +612,8 @@ export const CustomMapView: React.FC<CustomMapViewProps> = ({
           onOpenInMaps={handleOpenInMaps}
         />
       )}
-    </View>
+      </View>
+    </ErrorBoundary>
   );
 };
 

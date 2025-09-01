@@ -1,7 +1,7 @@
 import { updateProfile } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { auth, firestore, storage } from '../config/firebase';
+import { auth, db as firestore, storage } from '../config/firebase';
 import { COLLECTIONS, STORAGE_PATHS } from '../constants/firebase';
 import { ProfileSetupData, User } from '../types/auth';
 import { generateAvatarURL, getFirebaseErrorMessage, sanitizeInput } from '../utils/firebase';

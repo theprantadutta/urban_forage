@@ -1,8 +1,9 @@
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
 import { Auth, getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
-import { Firestore, getFirestore } from 'firebase/firestore';
-import { FirebaseStorage, getStorage } from 'firebase/storage';
+import { Firestore, connectFirestoreEmulator, doc, getFirestore } from 'firebase/firestore';
+import { FirebaseStorage, connectStorageEmulator, getStorage } from 'firebase/storage';
+import { isDevelopment, isFirebaseConfigured, logFirebaseOperation } from '../utils/firebase';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -15,43 +16,89 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Validate required configuration
-const requiredConfig = [
-  'apiKey',
-  'authDomain', 
-  'projectId',
-  'storageBucket',
-  'messagingSenderId',
-  'appId'
-];
-
-for (const key of requiredConfig) {
-  if (!firebaseConfig[key as keyof typeof firebaseConfig]) {
-    throw new Error(`Missing required Firebase configuration: ${key}`);
-  }
+// Validate configuration
+if (!isFirebaseConfigured()) {
+  console.error('❌ Firebase configuration is incomplete. Please check your environment variables.');
+  throw new Error('Firebase configuration is incomplete');
 }
 
 // Initialize Firebase app
 let app: FirebaseApp;
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
+  logFirebaseOperation('initializeApp', { projectId: firebaseConfig.projectId });
 } else {
   app = getApps()[0];
 }
 
-// Initialize Firebase services
+// Initialize Firebase Auth with AsyncStorage persistence
 let auth: Auth;
 try {
   auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(ReactNativeAsyncStorage)     
+    persistence: getReactNativePersistence(AsyncStorage),
   });
-} catch {
-  // If already initialized, get the existing instance
+  logFirebaseOperation('initializeAuth', { persistence: 'AsyncStorage' });
+} catch (error) {
+  // If auth is already initialized, get the existing instance
   auth = getAuth(app);
+  logFirebaseOperation('getAuth', { existing: true });
 }
 
-const firestore: Firestore = getFirestore(app);
-const storage: FirebaseStorage = getStorage(app);
+// Initialize Firestore
+const db: Firestore = getFirestore(app);
+logFirebaseOperation('initializeFirestore', { projectId: firebaseConfig.projectId });
 
-export { app, auth, firestore, storage };
+// Initialize Storage
+const storage: FirebaseStorage = getStorage(app);
+logFirebaseOperation('initializeStorage', { bucket: firebaseConfig.storageBucket });
+
+// Connect to emulators in development
+if (isDevelopment()) {
+  const EMULATOR_HOST = 'localhost';
+  
+  try {
+    // Connect Firestore emulator
+    connectFirestoreEmulator(db, EMULATOR_HOST, 8080);
+    logFirebaseOperation('connectFirestoreEmulator', { host: EMULATOR_HOST, port: 8080 });
+  } catch (error) {
+    // Emulator already connected or not available
+    logFirebaseOperation('firestoreEmulatorConnection', { error: 'Already connected or not available' });
+  }
+
+  try {
+    // Connect Storage emulator
+    connectStorageEmulator(storage, EMULATOR_HOST, 9199);
+    logFirebaseOperation('connectStorageEmulator', { host: EMULATOR_HOST, port: 9199 });
+  } catch (error) {
+    // Emulator already connected or not available
+    logFirebaseOperation('storageEmulatorConnection', { error: 'Already connected or not available' });
+  }
+}
+
+// Export Firebase services
+export { app, auth, db, storage };
+
+// Export configuration for debugging
+export const getFirebaseConfig = () => ({
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+  storageBucket: firebaseConfig.storageBucket,
+  isDevelopment: isDevelopment(),
+  isConfigured: isFirebaseConfigured(),
+});
+
+// Health check function
+export const checkFirebaseConnection = async (): Promise<boolean> => {
+  try {
+    // Simple Firestore read to test connection
+    const testDoc = doc(db, 'test', 'connection');
+    await testDoc;
+    logFirebaseOperation('healthCheck', { status: 'connected' });
+    return true;
+  } catch (error) {
+    logFirebaseOperation('healthCheck', { status: 'failed', error });
+    return false;
+  }
+};
+
 export default app;

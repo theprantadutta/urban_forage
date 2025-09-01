@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
+import { createError, handleErrorWithRecovery } from '../utils/errorHandling';
 
 export interface LocationData {
   latitude: number;
@@ -16,6 +17,10 @@ export interface LocationError {
   code: string;
   message: string;
   type: 'permission' | 'unavailable' | 'timeout' | 'accuracy';
+  recoverable: boolean;
+  retryable: boolean;
+  timestamp: number;
+  context?: Record<string, any>;
 }
 
 interface LocationServiceOptions {
@@ -113,11 +118,17 @@ export const useLocationService = (
             ]
           );
         }
-        setError({
+        const error: LocationError = {
           code: 'LOCATION_UNAVAILABLE',
           message: 'Location services are disabled',
           type: 'unavailable',
-        });
+          recoverable: true,
+          retryable: true,
+          timestamp: Date.now(),
+          context: { servicesEnabled: isEnabled }
+        };
+        setError(error);
+        handleErrorWithRecovery(createError('LOCATION_UNAVAILABLE', { servicesEnabled: isEnabled }), { showAlert: false });
         return false;
       }
 
@@ -126,11 +137,17 @@ export const useLocationService = (
       setPermissionStatus(foregroundStatus);
       
       if (foregroundStatus !== 'granted') {
-        setError({
-          code: 'PERMISSION_DENIED',
+        const error: LocationError = {
+          code: 'LOCATION_PERMISSION_DENIED',
           message: 'Location permission was denied',
           type: 'permission',
-        });
+          recoverable: false,
+          retryable: false,
+          timestamp: Date.now(),
+          context: { status: foregroundStatus }
+        };
+        setError(error);
+        handleErrorWithRecovery(createError('LOCATION_PERMISSION_DENIED', { status: foregroundStatus }), { showAlert: false });
         setHasPermission(false);
         return false;
       }
@@ -153,6 +170,9 @@ export const useLocationService = (
         code: 'PERMISSION_ERROR',
         message: err instanceof Error ? err.message : 'Unknown permission error',
         type: 'permission',
+        recoverable: false,
+        retryable: false,
+        timestamp: Date.now(),
       });
       setHasPermission(false);
       return false;
@@ -193,6 +213,9 @@ export const useLocationService = (
         code: 'LOCATION_ERROR',
         message: err instanceof Error ? err.message : 'Failed to get current location',
         type: 'unavailable',
+        recoverable: true,
+        retryable: true,
+        timestamp: Date.now(),
       });
       return null;
     }
@@ -251,6 +274,9 @@ export const useLocationService = (
         code: 'TRACKING_ERROR',
         message: err instanceof Error ? err.message : 'Failed to start location tracking',
         type: 'unavailable',
+        recoverable: true,
+        retryable: true,
+        timestamp: Date.now(),
       });
       setIsTracking(false);
       return false;

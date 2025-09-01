@@ -1,28 +1,50 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  Image,
-  ImageProps,
-  ScrollView,
-  ScrollViewProps,
-  Switch,
-  SwitchProps,
-  Text,
-  TextInput,
-  TextInputProps,
-  TextProps,
-  TouchableOpacity,
-  TouchableOpacityProps,
-  View,
-  ViewProps,
-  findNodeHandle,
+    Image,
+    ImageProps,
+    ScrollView,
+    ScrollViewProps,
+    Switch,
+    SwitchProps,
+    Text,
+    TextInput,
+    TextInputProps,
+    TextProps,
+    TouchableOpacity,
+    TouchableOpacityProps,
+    View,
+    ViewProps,
+    findNodeHandle,
 } from 'react-native';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
 import { useTheme } from '../../providers/ThemeProvider';
 import {
-  AccessibilityHelpers,
-  AccessibilityRoles,
-  buildAccessibilityProps,
-  useAccessibility,
+    ACCESSIBILITY_ROLES
 } from '../../utils/accessibility';
+
+// Helper functions to replace the missing ones
+const buildAccessibilityProps = (props: any) => ({
+  accessible: true,
+  accessibilityRole: props.role,
+  accessibilityLabel: props.label,
+  accessibilityHint: props.hint,
+  accessibilityState: props.state,
+  accessibilityValue: props.value,
+  accessibilityLevel: props.level,
+});
+
+const AccessibilityRoles = {
+  ...ACCESSIBILITY_ROLES,
+  HEADING: 'header',
+  LIST_ITEM: 'listitem',
+  PROGRESS_BAR: 'progressbar',
+};
+
+const AccessibilityHelpers = {
+  getTouchTargetSize: (size: number) => size,
+  createLabel: (primary: string, secondary?: string, error?: string) => 
+    error ? `Error: ${error}` : (secondary ? `${primary}, ${secondary}` : primary),
+};
 
 // Accessible Button Component
 interface AccessibleButtonProps extends TouchableOpacityProps {

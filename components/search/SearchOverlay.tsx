@@ -11,7 +11,15 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useAccessibility } from '../../contexts/AccessibilityContext';
+import {
+    ACCESSIBILITY_ROLES,
+    accessibleHapticFeedback,
+    createAccessibilityHint
+} from '../../utils/accessibility';
+import { getCachedData, setCachedData } from '../../utils/errorHandling';
 import type { FoodListing } from '../map/FoodMarker';
+import { SearchErrorHandler } from './SearchErrorHandler';
 
 interface SearchSuggestion {
   id: string;
@@ -53,6 +61,13 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>(SEARCH_SUGGESTIONS);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [searchError, setSearchError] = useState<{
+    type: 'service_error' | 'timeout' | 'invalid_query' | 'no_results';
+    message: string;
+    query?: string;
+  } | null>(null);
+  const [cachedResults, setCachedResults] = useState<FoodListing[]>([]);
+  const { isScreenReaderEnabled, announceMessage, isReduceMotionEnabled } = useAccessibility();
   
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const searchBarAnim = useRef(new Animated.Value(0)).current;
@@ -62,22 +77,66 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
   // Debounced search
   const debounceTimeout = useRef<any>(null);
 
-  const debouncedSearch = useCallback((query: string) => {
+  const debouncedSearch = useCallback(async (query: string) => {
     if (debounceTimeout.current) {
       clearTimeout(debounceTimeout.current);
     }
     
-    debounceTimeout.current = setTimeout(() => {
-      onSearch(query);
-      if (query.trim()) {
-        // Add to recent searches
-        setRecentSearches(prev => {
-          const updated = [query, ...prev.filter(item => item !== query)].slice(0, 5);
-          return updated;
+    debounceTimeout.current = setTimeout(async () => {
+      try {
+        setSearchError(null);
+        
+        // Validate query
+        if (query.trim().length > 0 && query.trim().length < 2) {
+          setSearchError({
+            type: 'invalid_query',
+            message: 'Search query must be at least 2 characters long.',
+            query,
+          });
+          return;
+        }
+        
+        // Cache current results before new search
+        if (foodListings.length > 0) {
+          await setCachedData('search_results', foodListings);
+          setCachedResults(foodListings);
+        }
+        
+        // Perform search
+        onSearch(query);
+        
+        if (query.trim()) {
+          // Add to recent searches
+          setRecentSearches(prev => {
+            const updated = [query, ...prev.filter(item => item !== query)].slice(0, 5);
+            return updated;
+          });
+          
+          // Cache recent searches
+          setCachedData('recent_searches', recentSearches);
+        }
+        
+        // Simulate search timeout (in real app, this would be handled by the search service)
+        setTimeout(() => {
+          if (foodListings.length === 0 && query.trim()) {
+            setSearchError({
+              type: 'no_results',
+              message: `No food listings found for "${query}". Try different keywords or expand your search area.`,
+              query,
+            });
+          }
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchError({
+          type: 'service_error',
+          message: 'Search service is temporarily unavailable. Please try again.',
+          query,
         });
       }
     }, 300);
-  }, [onSearch]);
+  }, [onSearch, foodListings, recentSearches]);
 
   // Handle search query changes
   const handleSearchChange = useCallback((text: string) => {
@@ -90,16 +149,25 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
         suggestion.text.toLowerCase().includes(text.toLowerCase())
       );
       setSuggestions(filtered);
+      
+      // Announce filtered suggestions count for screen readers
+      if (isScreenReaderEnabled) {
+        announceMessage(`${filtered.length} suggestions available`);
+      }
     } else {
       setSuggestions(SEARCH_SUGGESTIONS);
     }
-  }, [onSearchQueryChange, debouncedSearch]);
+  }, [onSearchQueryChange, debouncedSearch, isScreenReaderEnabled, announceMessage]);
 
   // Voice search functionality
   const handleVoiceSearch = useCallback(async () => {
     try {
       setIsListening(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await accessibleHapticFeedback('impact');
+      
+      if (isScreenReaderEnabled) {
+        announceMessage('Voice search started, listening for your query');
+      }
       
       // Note: Expo Speech doesn't have speech recognition, only text-to-speech
       // In a real app, you'd use expo-speech-recognition or react-native-voice
@@ -112,6 +180,10 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
         handleSearchChange(randomQuery);
         setIsListening(false);
         
+        if (isScreenReaderEnabled) {
+          announceMessage(`Voice search completed. Searching for ${randomQuery}`);
+        }
+        
         // Provide audio feedback (commented out for now)
         // Speech.speak('Searching for ' + randomQuery, {
         //   language: 'en',
@@ -123,62 +195,88 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
     } catch (error) {
       console.error('Voice search error:', error);
       setIsListening(false);
+      if (isScreenReaderEnabled) {
+        announceMessage('Voice search failed. Please try again or use text input.');
+      }
     }
-  }, [handleSearchChange]);
+  }, [handleSearchChange, isScreenReaderEnabled, announceMessage]);
 
   // Animation effects
   useEffect(() => {
     if (isVisible) {
       // Focus text input when overlay opens
-      setTimeout(() => textInputRef.current?.focus(), 100);
+      setTimeout(() => {
+        textInputRef.current?.focus();
+        if (isScreenReaderEnabled) {
+          announceMessage('Search overlay opened. Search field is focused.');
+        }
+      }, 100);
       
-      Animated.parallel([
-        Animated.timing(overlayAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(searchBarAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(suggestionsAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      if (!isReduceMotionEnabled) {
+        Animated.parallel([
+          Animated.timing(overlayAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(searchBarAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(suggestionsAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        // Skip animations if reduce motion is enabled
+        overlayAnim.setValue(1);
+        searchBarAnim.setValue(1);
+        suggestionsAnim.setValue(1);
+      }
     } else {
-      Animated.parallel([
-        Animated.timing(overlayAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(searchBarAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(suggestionsAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      if (!isReduceMotionEnabled) {
+        Animated.parallel([
+          Animated.timing(overlayAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(searchBarAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(suggestionsAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        overlayAnim.setValue(0);
+        searchBarAnim.setValue(0);
+        suggestionsAnim.setValue(0);
+      }
     }
-  }, [isVisible, overlayAnim, searchBarAnim, suggestionsAnim]);
+  }, [isVisible, overlayAnim, searchBarAnim, suggestionsAnim, isScreenReaderEnabled, announceMessage, isReduceMotionEnabled]);
 
   // Handle suggestion selection
-  const handleSuggestionPress = useCallback((suggestion: SearchSuggestion) => {
-    Haptics.selectionAsync();
+  const handleSuggestionPress = useCallback(async (suggestion: SearchSuggestion) => {
+    await accessibleHapticFeedback('selection');
+    
+    if (isScreenReaderEnabled) {
+      announceMessage(`Selected ${suggestion.text}. Searching now.`);
+    }
+    
     handleSearchChange(suggestion.text);
     textInputRef.current?.blur();
-  }, [handleSearchChange]);
+  }, [handleSearchChange, isScreenReaderEnabled, announceMessage]);
 
   // Handle clear search
-  const handleClearSearch = useCallback(() => {
+  const handleClearSearchInput = useCallback(() => {
     Haptics.selectionAsync();
     handleSearchChange('');
     textInputRef.current?.focus();
@@ -189,6 +287,45 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
     Keyboard.dismiss();
     onClose();
   }, [onClose]);
+
+  // Search error handlers
+  const handleRetrySearch = useCallback((query?: string) => {
+    const retryQuery = query || searchQuery;
+    setSearchError(null);
+    debouncedSearch(retryQuery);
+  }, [searchQuery, debouncedSearch]);
+
+  const handleUseCachedResults = useCallback(() => {
+    setSearchError(null);
+    // In a real app, you would update the parent component with cached results
+    console.log('Using cached results:', cachedResults);
+  }, [cachedResults]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchError(null);
+    handleSearchChange('');
+  }, [handleSearchChange]);
+
+  // Load cached data on mount
+  useEffect(() => {
+    const loadCachedData = async () => {
+      try {
+        const cached = await getCachedData<string[]>('recent_searches');
+        if (cached) {
+          setRecentSearches(cached);
+        }
+        
+        const cachedSearchResults = await getCachedData<FoodListing[]>('search_results');
+        if (cachedSearchResults) {
+          setCachedResults(cachedSearchResults);
+        }
+      } catch (error) {
+        console.error('Failed to load cached search data:', error);
+      }
+    };
+    
+    loadCachedData();
+  }, []);
 
   if (!isVisible) return null;
 
@@ -205,8 +342,8 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
   const renderSuggestion = ({ item, index }: { item: SearchSuggestion; index: number }) => (
     <Animated.View
       style={{
-        opacity: suggestionsAnim,
-        transform: [
+        opacity: isReduceMotionEnabled ? 1 : suggestionsAnim,
+        transform: isReduceMotionEnabled ? [] : [
           {
             translateY: suggestionsAnim.interpolate({
               inputRange: [0, 1],
@@ -217,9 +354,19 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
       }}
     >
       <TouchableOpacity
-        className="flex-row items-center px-6 py-4 border-b border-gray-100 active:bg-gray-50"
+        className="flex-row items-center px-6 py-4 border-b border-gray-100 active:bg-gray-50 min-h-[60px]"
         onPress={() => handleSuggestionPress(item)}
         style={{ animationDelay: `${index * 50}ms` }}
+        accessible={true}
+        accessibilityRole={ACCESSIBILITY_ROLES.BUTTON}
+        accessibilityLabel={`Search for ${item.text}`}
+        accessibilityHint={createAccessibilityHint(
+          'search',
+          `Searches for ${item.text} in available food listings`
+        )}
+        accessibilityValue={{
+          text: `${item.type === 'recent' ? 'Recent search' : item.type} suggestion`
+        }}
       >
         <View className="w-10 h-10 bg-forest-green/10 rounded-full items-center justify-center mr-4">
           <Ionicons
@@ -307,13 +454,18 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
               onChangeText={handleSearchChange}
               returnKeyType="search"
               onSubmitEditing={() => textInputRef.current?.blur()}
+              accessible={true}
+              accessibilityRole={ACCESSIBILITY_ROLES.SEARCH}
+              accessibilityLabel="Search for food listings"
+              accessibilityHint="Enter keywords to search for food, categories, or locations"
+              accessibilityValue={searchQuery ? { text: searchQuery } : undefined}
             />
             
             {/* Clear Button */}
             {searchQuery.length > 0 && (
               <TouchableOpacity
                 className="w-6 h-6 items-center justify-center rounded-full bg-gray-300 mr-2 active:bg-gray-400"
-                onPress={handleClearSearch}
+                onPress={handleClearSearchInput}
               >
                 <Ionicons name="close" size={12} color="#6B7280" />
               </TouchableOpacity>
@@ -326,6 +478,14 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
               } active:scale-95`}
               onPress={handleVoiceSearch}
               disabled={isListening}
+              accessible={true}
+              accessibilityRole={ACCESSIBILITY_ROLES.BUTTON}
+              accessibilityLabel={isListening ? 'Voice search in progress' : 'Start voice search'}
+              accessibilityHint={isListening ? 'Voice search is listening for your query' : 'Double tap to start voice search'}
+              accessibilityState={{
+                busy: isListening,
+                disabled: isListening,
+              }}
             >
               <Ionicons
                 name={isListening ? 'mic' : 'mic-outline'}
@@ -347,7 +507,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
         </Animated.View>
 
         {/* Search Results Count */}
-        {searchQuery.trim() && (
+        {searchQuery.trim() && !searchError && (
           <Animated.View
             className="px-6 mb-4"
             style={{ opacity: suggestionsAnim }}
@@ -358,47 +518,65 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
           </Animated.View>
         )}
 
+        {/* Search Error Handler */}
+        {searchError && (
+          <Animated.View
+            className="px-6 mb-4"
+            style={{ opacity: suggestionsAnim }}
+          >
+            <SearchErrorHandler
+              error={searchError}
+              onRetry={handleRetrySearch}
+              onUseCachedResults={handleUseCachedResults}
+              onClearSearch={handleClearSearch}
+              cachedResultsCount={cachedResults.length}
+            />
+          </Animated.View>
+        )}
+
         {/* Suggestions List */}
-        <Animated.View
-          className="flex-1"
-          style={{
-            opacity: suggestionsAnim,
-            transform: [{ translateY: suggestionsTranslateY }],
-          }}
-        >
-          <FlatList
-            data={searchQuery.trim() ? suggestions : [...recentSearches.map(search => ({
-              id: search,
-              text: search,
-              type: 'recent' as const,
-              icon: 'time' as keyof typeof Ionicons.glyphMap,
-            })), ...SEARCH_SUGGESTIONS]}
-            renderItem={renderSuggestion}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={
-              recentSearches.length > 0 && !searchQuery.trim() ? (
-                <View className="px-6 py-2 border-b border-gray-100">
-                  <Text className="text-gray-500 text-sm font-medium uppercase tracking-wide">
-                    Recent Searches
+        {!searchError && (
+          <Animated.View
+            className="flex-1"
+            style={{
+              opacity: suggestionsAnim,
+              transform: [{ translateY: suggestionsTranslateY }],
+            }}
+          >
+            <FlatList
+              data={searchQuery.trim() ? suggestions : [...recentSearches.map(search => ({
+                id: search,
+                text: search,
+                type: 'recent' as const,
+                icon: 'time' as keyof typeof Ionicons.glyphMap,
+              })), ...SEARCH_SUGGESTIONS]}
+              renderItem={renderSuggestion}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={
+                recentSearches.length > 0 && !searchQuery.trim() ? (
+                  <View className="px-6 py-2 border-b border-gray-100">
+                    <Text className="text-gray-500 text-sm font-medium uppercase tracking-wide">
+                      Recent Searches
+                    </Text>
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                <View className="items-center justify-center py-12">
+                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                  <Text className="text-gray-500 text-lg font-medium mt-4">
+                    No suggestions found
+                  </Text>
+                  <Text className="text-gray-400 text-sm text-center mt-2 px-6">
+                    Try searching for food categories, locations, or specific items
                   </Text>
                 </View>
-              ) : null
-            }
-            ListEmptyComponent={
-              <View className="items-center justify-center py-12">
-                <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-                <Text className="text-gray-500 text-lg font-medium mt-4">
-                  No suggestions found
-                </Text>
-                <Text className="text-gray-400 text-sm text-center mt-2 px-6">
-                  Try searching for food categories, locations, or specific items
-                </Text>
-              </View>
-            }
-          />
-        </Animated.View>
+              }
+            />
+          </Animated.View>
+        )}
       </Animated.View>
     </Animated.View>
   );

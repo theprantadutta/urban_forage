@@ -1,52 +1,35 @@
-import { useCallback, useEffect, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { AccessibilityInfo, Platform } from 'react-native';
 
 // Accessibility constants
-export const AccessibilityConstants = {
-  MINIMUM_TOUCH_TARGET_SIZE: 44,
-  FOCUS_TIMEOUT: 100,
-  ANNOUNCEMENT_DELAY: 500,
-} as const;
-
-// Accessibility roles for better semantic meaning
-export const AccessibilityRoles = {
+export const ACCESSIBILITY_ROLES = {
   BUTTON: 'button',
   LINK: 'link',
   TEXT: 'text',
-  HEADING: 'header',
   IMAGE: 'image',
-  LIST: 'list',
-  LIST_ITEM: 'listitem',
-  TAB: 'tab',
-  TAB_LIST: 'tablist',
+  HEADER: 'header',
   SEARCH: 'search',
+  TAB: 'tab',
+  TABLIST: 'tablist',
   MENU: 'menu',
-  MENU_ITEM: 'menuitem',
-  ALERT: 'alert',
-  DIALOG: 'dialog',
+  MENUITEM: 'menuitem',
   CHECKBOX: 'checkbox',
   RADIO: 'radio',
   SWITCH: 'switch',
   SLIDER: 'slider',
-  PROGRESS_BAR: 'progressbar',
-  LOADING: 'progressbar',
+  PROGRESSBAR: 'progressbar',
+  ALERT: 'alert',
+  DIALOG: 'dialog',
+  LIST: 'list',
+  LISTITEM: 'listitem',
 } as const;
 
-// Accessibility states
-export const AccessibilityStates = {
-  DISABLED: { disabled: true },
-  SELECTED: { selected: true },
-  CHECKED: { checked: true },
-  EXPANDED: { expanded: true },
-  BUSY: { busy: true },
-} as const;
-
-// Accessibility traits for iOS
-export const AccessibilityTraits = {
+export const ACCESSIBILITY_TRAITS = {
+  NONE: 'none',
   BUTTON: 'button',
   LINK: 'link',
   HEADER: 'header',
-  SEARCH_FIELD: 'searchField',
+  SEARCH: 'search',
   IMAGE: 'image',
   SELECTED: 'selected',
   PLAYS_SOUND: 'playsSound',
@@ -61,296 +44,442 @@ export const AccessibilityTraits = {
   CAUSES_PAGE_TURN: 'causesPageTurn',
 } as const;
 
-// Screen reader detection
-export const useScreenReader = () => {
-  const [isScreenReaderEnabled, setIsScreenReaderEnabled] = useState(false);
-  const [screenReaderChanged, setScreenReaderChanged] = useState(false);
+// Accessibility state management
+interface AccessibilityState {
+  isScreenReaderEnabled: boolean;
+  isReduceMotionEnabled: boolean;
+  isHighContrastEnabled: boolean;
+  preferredContentSizeCategory: string;
+}
 
-  useEffect(() => {
-    // Check initial state
-    AccessibilityInfo.isScreenReaderEnabled().then(setIsScreenReaderEnabled);
-
-    // Listen for changes
-    const subscription = AccessibilityInfo.addEventListener(
-      'screenReaderChanged',
-      (enabled) => {
-        setIsScreenReaderEnabled(enabled);
-        setScreenReaderChanged(true);
-        // Reset the changed flag after a delay
-        setTimeout(() => setScreenReaderChanged(false), 1000);
-      }
-    );
-
-    return () => subscription?.remove();
-  }, []);
-
-  return {
-    isScreenReaderEnabled,
-    screenReaderChanged,
-  };
+let accessibilityState: AccessibilityState = {
+  isScreenReaderEnabled: false,
+  isReduceMotionEnabled: false,
+  isHighContrastEnabled: false,
+  preferredContentSizeCategory: 'medium',
 };
 
-// Reduced motion detection
-export const useReducedMotion = () => {
-  const [isReducedMotionEnabled, setIsReducedMotionEnabled] = useState(false);
+// Initialize accessibility state
+export const initializeAccessibility = async (): Promise<AccessibilityState> => {
+  try {
+    const [
+      isScreenReaderEnabled,
+      isReduceMotionEnabled,
+      isHighContrastEnabled,
+    ] = await Promise.all([
+      AccessibilityInfo.isScreenReaderEnabled(),
+      AccessibilityInfo.isReduceMotionEnabled(),
+      Platform.OS === 'ios' ? AccessibilityInfo.isHighTextContrastEnabled() : Promise.resolve(false),
+    ]);
 
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setIsReducedMotionEnabled);
+    accessibilityState = {
+      isScreenReaderEnabled,
+      isReduceMotionEnabled,
+      isHighContrastEnabled,
+      preferredContentSizeCategory: 'medium', // Default value
+    };
 
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      setIsReducedMotionEnabled
-    );
-
-    return () => subscription?.remove();
-  }, []);
-
-  return isReducedMotionEnabled;
+    return accessibilityState;
+  } catch (error) {
+    console.error('Failed to initialize accessibility state:', error);
+    return accessibilityState;
+  }
 };
 
-// High contrast detection
-export const useHighContrast = () => {
-  const [isHighContrastEnabled, setIsHighContrastEnabled] = useState(false);
-
-  useEffect(() => {
-    if (Platform.OS === 'ios') {
-      AccessibilityInfo.isHighTextContrastEnabled?.().then(setIsHighContrastEnabled);
-
-      const subscription = AccessibilityInfo.addEventListener(
-        'highTextContrastChanged',
-        setIsHighContrastEnabled
-      );
-
-      return () => subscription?.remove();
-    }
-  }, []);
-
-  return isHighContrastEnabled;
-};
-
-// Accessibility announcements
-export const useAccessibilityAnnouncements = () => {
-  const announce = useCallback((message: string, priority: 'low' | 'high' = 'low') => {
-    if (Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibility(message);
-    } else {
-      // For Android, we can use setAccessibilityFocus or announceForAccessibility
-      AccessibilityInfo.announceForAccessibility(message);
-    }
-  }, []);
-
-  const announceDelayed = useCallback((message: string, delay: number = AccessibilityConstants.ANNOUNCEMENT_DELAY) => {
-    setTimeout(() => announce(message), delay);
-  }, [announce]);
-
-  return {
-    announce,
-    announceDelayed,
-  };
-};
-
-// Focus management
-export const useFocusManagement = () => {
-  const setAccessibilityFocus = useCallback((reactTag: number) => {
-    if (Platform.OS === 'ios') {
-      AccessibilityInfo.setAccessibilityFocus(reactTag);
-    } else {
-      // Android focus management
-      AccessibilityInfo.setAccessibilityFocus(reactTag);
-    }
-  }, []);
-
-  const setAccessibilityFocusDelayed = useCallback((reactTag: number, delay: number = AccessibilityConstants.FOCUS_TIMEOUT) => {
-    setTimeout(() => setAccessibilityFocus(reactTag), delay);
-  }, [setAccessibilityFocus]);
-
-  return {
-    setAccessibilityFocus,
-    setAccessibilityFocusDelayed,
-  };
+// Get current accessibility state
+export const getAccessibilityState = (): AccessibilityState => {
+  return accessibilityState;
 };
 
 // Accessibility helpers
-export const AccessibilityHelpers = {
-  // Create accessible label from multiple strings
-  createLabel: (...parts: (string | undefined | null)[]): string => {
-    return parts.filter(Boolean).join(', ');
-  },
-
-  // Create accessible hint
-  createHint: (action: string, result?: string): string => {
-    if (result) {
-      return `${action}. ${result}`;
-    }
-    return action;
-  },
-
-  // Format number for screen readers
-  formatNumber: (num: number, unit?: string): string => {
-    const formatted = num.toLocaleString();
-    return unit ? `${formatted} ${unit}` : formatted;
-  },
-
-  // Format date for screen readers
-  formatDate: (date: Date): string => {
-    return date.toLocaleDateString(undefined, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  },
-
-  // Format time for screen readers
-  formatTime: (date: Date): string => {
-    return date.toLocaleTimeString(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  },
-
-  // Create loading announcement
-  createLoadingAnnouncement: (isLoading: boolean, context?: string): string => {
-    const baseMessage = isLoading ? 'Loading' : 'Loading complete';
-    return context ? `${baseMessage}, ${context}` : baseMessage;
-  },
-
-  // Create error announcement
-  createErrorAnnouncement: (error: string, context?: string): string => {
-    const baseMessage = `Error: ${error}`;
-    return context ? `${baseMessage}, in ${context}` : baseMessage;
-  },
-
-  // Create success announcement
-  createSuccessAnnouncement: (message: string, context?: string): string => {
-    const baseMessage = `Success: ${message}`;
-    return context ? `${baseMessage}, in ${context}` : baseMessage;
-  },
-
-  // Get appropriate touch target size
-  getTouchTargetSize: (size: number): number => {
-    return Math.max(size, AccessibilityConstants.MINIMUM_TOUCH_TARGET_SIZE);
-  },
-
-  // Check if element meets minimum touch target size
-  meetsMinimumTouchTarget: (width: number, height: number): boolean => {
-    return width >= AccessibilityConstants.MINIMUM_TOUCH_TARGET_SIZE && 
-           height >= AccessibilityConstants.MINIMUM_TOUCH_TARGET_SIZE;
-  },
+export const createAccessibilityLabel = (
+  primary: string,
+  secondary?: string,
+  context?: string
+): string => {
+  let label = primary;
+  
+  if (secondary) {
+    label += `, ${secondary}`;
+  }
+  
+  if (context) {
+    label += `. ${context}`;
+  }
+  
+  return label;
 };
 
-// Accessibility testing helpers
-export const AccessibilityTesting = {
-  // Log accessibility properties for debugging
-  logAccessibilityProps: (componentName: string, props: any) => {
-    if (__DEV__) {
-      console.log(`[A11Y] ${componentName}:`, {
-        accessibilityLabel: props.accessibilityLabel,
-        accessibilityHint: props.accessibilityHint,
-        accessibilityRole: props.accessibilityRole,
-        accessibilityState: props.accessibilityState,
-        accessible: props.accessible,
-      });
-    }
-  },
-
-  // Validate accessibility props
-  validateAccessibilityProps: (componentName: string, props: any): string[] => {
-    const warnings: string[] = [];
-
-    if (props.accessibilityRole === 'button' && !props.accessibilityLabel) {
-      warnings.push(`${componentName}: Button should have accessibilityLabel`);
-    }
-
-    if (props.accessibilityLabel && props.accessibilityLabel.length > 100) {
-      warnings.push(`${componentName}: accessibilityLabel is too long (${props.accessibilityLabel.length} chars)`);
-    }
-
-    if (props.accessibilityHint && props.accessibilityHint.length > 150) {
-      warnings.push(`${componentName}: accessibilityHint is too long (${props.accessibilityHint.length} chars)`);
-    }
-
-    if (__DEV__ && warnings.length > 0) {
-      console.warn('[A11Y Warnings]:', warnings);
-    }
-
-    return warnings;
-  },
+export const createAccessibilityHint = (action: string, result?: string): string => {
+  let hint = `Double tap to ${action}`;
+  
+  if (result) {
+    hint += `. ${result}`;
+  }
+  
+  return hint;
 };
 
-// Accessibility context for theme-aware accessibility
-export interface AccessibilityContextType {
-  isScreenReaderEnabled: boolean;
-  isReducedMotionEnabled: boolean;
-  isHighContrastEnabled: boolean;
-  announceMessage: (message: string) => void;
-  setFocus: (reactTag: number) => void;
-}
+// Food listing accessibility helpers
+export const getFoodListingAccessibilityLabel = (listing: {
+  title: string;
+  category: string;
+  distance?: string;
+  availability: string;
+  timeLeft?: string;
+  isUrgent?: boolean;
+}): string => {
+  const parts = [listing.title, listing.category];
+  
+  if (listing.distance) {
+    parts.push(`${listing.distance} away`);
+  }
+  
+  parts.push(`${listing.availability} availability`);
+  
+  if (listing.timeLeft) {
+    parts.push(`${listing.timeLeft} remaining`);
+  }
+  
+  if (listing.isUrgent) {
+    parts.push('urgent pickup needed');
+  }
+  
+  return parts.join(', ');
+};
 
-// Hook for comprehensive accessibility state
-export const useAccessibility = (): AccessibilityContextType => {
-  const { isScreenReaderEnabled } = useScreenReader();
-  const isReducedMotionEnabled = useReducedMotion();
-  const isHighContrastEnabled = useHighContrast();
-  const { announce } = useAccessibilityAnnouncements();
-  const { setAccessibilityFocus } = useFocusManagement();
+export const getMapMarkerAccessibilityLabel = (listing: {
+  title: string;
+  category: string;
+  availability: string;
+}): string => {
+  return `${listing.title}, ${listing.category}, ${listing.availability} availability. Double tap to view details.`;
+};
 
+export const getFilterChipAccessibilityLabel = (
+  filter: string,
+  isSelected: boolean,
+  count?: number
+): string => {
+  let label = filter;
+  
+  if (count !== undefined) {
+    label += `, ${count} items`;
+  }
+  
+  label += isSelected ? ', selected' : ', not selected';
+  
+  return label;
+};
+
+// Search accessibility helpers
+export const getSearchResultsAccessibilityLabel = (count: number, query?: string): string => {
+  if (count === 0) {
+    return query ? `No results found for ${query}` : 'No results found';
+  }
+  
+  const resultsText = count === 1 ? 'result' : 'results';
+  const baseText = `${count} ${resultsText} found`;
+  
+  return query ? `${baseText} for ${query}` : baseText;
+};
+
+// Navigation accessibility helpers
+export const getNavigationAccessibilityLabel = (
+  destination: string,
+  distance?: string,
+  estimatedTime?: string
+): string => {
+  let label = `Navigate to ${destination}`;
+  
+  if (distance) {
+    label += `, ${distance} away`;
+  }
+  
+  if (estimatedTime) {
+    label += `, estimated ${estimatedTime}`;
+  }
+  
+  return label;
+};
+
+// Error state accessibility helpers
+export const getErrorAccessibilityLabel = (
+  errorType: string,
+  message: string,
+  hasRetry: boolean
+): string => {
+  let label = `${errorType} error: ${message}`;
+  
+  if (hasRetry) {
+    label += '. Retry option available.';
+  }
+  
+  return label;
+};
+
+// Loading state accessibility helpers
+export const getLoadingAccessibilityLabel = (context: string): string => {
+  return `Loading ${context}, please wait`;
+};
+
+// Haptic feedback for accessibility
+export const accessibleHapticFeedback = async (
+  type: 'selection' | 'impact' | 'notification' = 'selection'
+): Promise<void> => {
+  try {
+    // Only provide haptic feedback if reduce motion is not enabled
+    if (!accessibilityState.isReduceMotionEnabled) {
+      switch (type) {
+        case 'selection':
+          await Haptics.selectionAsync();
+          break;
+        case 'impact':
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          break;
+        case 'notification':
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+      }
+    }
+  } catch (error) {
+    console.error('Haptic feedback error:', error);
+  }
+};
+
+// Announce to screen reader
+export const announceToScreenReader = (message: string): void => {
+  if (accessibilityState.isScreenReaderEnabled) {
+    AccessibilityInfo.announceForAccessibility(message);
+  }
+};
+
+// Focus management
+export const setAccessibilityFocus = (ref: any): void => {
+  if (ref?.current && accessibilityState.isScreenReaderEnabled) {
+    AccessibilityInfo.setAccessibilityFocus(ref.current);
+  }
+};
+
+// High contrast color helpers
+export const getAccessibleColors = (defaultColors: {
+  primary: string;
+  secondary: string;
+  background: string;
+  text: string;
+}) => {
+  if (!accessibilityState.isHighContrastEnabled) {
+    return defaultColors;
+  }
+  
+  // Return high contrast versions
   return {
-    isScreenReaderEnabled,
-    isReducedMotionEnabled,
-    isHighContrastEnabled,
-    announceMessage: announce,
-    setFocus: setAccessibilityFocus,
+    primary: '#000000',
+    secondary: '#FFFFFF',
+    background: '#FFFFFF',
+    text: '#000000',
   };
 };
 
-// Accessibility props builder
-export const buildAccessibilityProps = (config: {
-  label?: string;
-  hint?: string;
-  role?: string;
-  state?: any;
-  traits?: string[];
-  value?: string;
-  adjustable?: boolean;
-  onAccessibilityAction?: (event: any) => void;
-}) => {
-  const props: any = {};
+// Text size helpers
+export const getAccessibleTextSize = (baseSize: number): number => {
+  // Adjust text size based on accessibility preferences
+  const sizeMultipliers = {
+    'extra-small': 0.8,
+    'small': 0.9,
+    'medium': 1.0,
+    'large': 1.1,
+    'extra-large': 1.2,
+    'extra-extra-large': 1.3,
+    'extra-extra-extra-large': 1.4,
+  };
+  
+  const multiplier = sizeMultipliers[accessibilityState.preferredContentSizeCategory as keyof typeof sizeMultipliers] || 1.0;
+  return Math.round(baseSize * multiplier);
+};
 
-  if (config.label) {
-    props.accessibilityLabel = config.label;
+// Keyboard navigation helpers
+export const isKeyboardNavigationEnabled = (): boolean => {
+  return Platform.OS === 'web' || Platform.OS === 'macos' || Platform.OS === 'windows';
+};
+
+export const getKeyboardShortcuts = () => {
+  return {
+    search: 'Cmd+F',
+    filter: 'Cmd+Shift+F',
+    refresh: 'Cmd+R',
+    back: 'Escape',
+    next: 'Tab',
+    previous: 'Shift+Tab',
+    select: 'Enter',
+    close: 'Escape',
+  };
+};
+
+// Keyboard navigation helpers
+export const handleKeyboardNavigation = (
+  event: any,
+  onEnter?: () => void,
+  onEscape?: () => void,
+  onArrowUp?: () => void,
+  onArrowDown?: () => void,
+  onArrowLeft?: () => void,
+  onArrowRight?: () => void
+) => {
+  if (!isKeyboardNavigationEnabled()) return;
+
+  switch (event.key) {
+    case 'Enter':
+    case ' ':
+      event.preventDefault();
+      onEnter?.();
+      break;
+    case 'Escape':
+      event.preventDefault();
+      onEscape?.();
+      break;
+    case 'ArrowUp':
+      event.preventDefault();
+      onArrowUp?.();
+      break;
+    case 'ArrowDown':
+      event.preventDefault();
+      onArrowDown?.();
+      break;
+    case 'ArrowLeft':
+      event.preventDefault();
+      onArrowLeft?.();
+      break;
+    case 'ArrowRight':
+      event.preventDefault();
+      onArrowRight?.();
+      break;
   }
+};
 
-  if (config.hint) {
-    props.accessibilityHint = config.hint;
+// Screen reader navigation helpers
+export const announceScreenChange = (screenName: string, context?: string) => {
+  const message = context 
+    ? `Navigated to ${screenName}. ${context}`
+    : `Navigated to ${screenName}`;
+  announceToScreenReader(message);
+};
+
+export const announceListUpdate = (itemCount: number, listType: string = 'items') => {
+  const message = itemCount === 0 
+    ? `No ${listType} available`
+    : `${itemCount} ${listType} ${itemCount === 1 ? 'available' : 'available'}`;
+  announceToScreenReader(message);
+};
+
+export const announceActionResult = (action: string, success: boolean, details?: string) => {
+  const result = success ? 'successful' : 'failed';
+  const message = details 
+    ? `${action} ${result}. ${details}`
+    : `${action} ${result}`;
+  announceToScreenReader(message);
+};
+
+// Accessibility testing helpers
+export const validateAccessibility = (component: {
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityRole?: string;
+  accessible?: boolean;
+}): string[] => {
+  const issues: string[] = [];
+  
+  if (!component.accessible && !component.accessibilityLabel) {
+    issues.push('Component should have accessibilityLabel or be marked as accessible');
   }
-
-  if (config.role) {
-    props.accessibilityRole = config.role;
+  
+  if (component.accessibilityLabel && component.accessibilityLabel.length > 100) {
+    issues.push('Accessibility label should be concise (under 100 characters)');
   }
-
-  if (config.state) {
-    props.accessibilityState = config.state;
+  
+  if (component.accessibilityHint && component.accessibilityHint.length > 150) {
+    issues.push('Accessibility hint should be concise (under 150 characters)');
   }
+  
+  return issues;
+};
 
-  if (config.value) {
-    props.accessibilityValue = { text: config.value };
+// Enhanced accessibility for map markers
+export const getEnhancedMapMarkerAccessibility = (listing: {
+  title: string;
+  category: string;
+  availability: string;
+  distance?: string;
+  timeLeft?: string;
+  isUrgent?: boolean;
+}, markerIndex?: number, totalMarkers?: number) => {
+  const baseLabel = getMapMarkerAccessibilityLabel(listing);
+  
+  let enhancedLabel = baseLabel;
+  
+  if (markerIndex !== undefined && totalMarkers !== undefined) {
+    enhancedLabel += ` Marker ${markerIndex + 1} of ${totalMarkers}.`;
   }
-
-  if (Platform.OS === 'ios' && config.traits) {
-    props.accessibilityTraits = config.traits;
+  
+  if (listing.distance) {
+    enhancedLabel += ` Located ${listing.distance} away.`;
   }
-
-  if (config.adjustable) {
-    props.accessible = true;
-    if (Platform.OS === 'ios') {
-      props.accessibilityTraits = [...(props.accessibilityTraits || []), 'adjustable'];
+  
+  if (listing.timeLeft) {
+    enhancedLabel += ` ${listing.timeLeft} remaining.`;
+  }
+  
+  if (listing.isUrgent) {
+    enhancedLabel += ` Urgent pickup needed.`;
+  }
+  
+  return {
+    accessibilityLabel: enhancedLabel,
+    accessibilityHint: 'Double tap to select and view details',
+    accessibilityRole: ACCESSIBILITY_ROLES.BUTTON,
+    accessibilityState: { selected: false },
+    accessibilityValue: { 
+      text: `${listing.availability} availability${listing.isUrgent ? ', urgent' : ''}` 
     }
-  }
+  };
+};
 
-  if (config.onAccessibilityAction) {
-    props.onAccessibilityAction = config.onAccessibilityAction;
-  }
+// Export hooks for React components
+export const useReducedMotion = (): boolean => {
+  return accessibilityState.isReduceMotionEnabled;
+};
 
-  return props;
+export const useHighContrast = (): boolean => {
+  return accessibilityState.isHighContrastEnabled;
+};
+
+export default {
+  initializeAccessibility,
+  getAccessibilityState,
+  createAccessibilityLabel,
+  createAccessibilityHint,
+  getFoodListingAccessibilityLabel,
+  getMapMarkerAccessibilityLabel,
+  getFilterChipAccessibilityLabel,
+  getSearchResultsAccessibilityLabel,
+  getNavigationAccessibilityLabel,
+  getErrorAccessibilityLabel,
+  getLoadingAccessibilityLabel,
+  accessibleHapticFeedback,
+  announceToScreenReader,
+  setAccessibilityFocus,
+  getAccessibleColors,
+  getAccessibleTextSize,
+  isKeyboardNavigationEnabled,
+  getKeyboardShortcuts,
+  validateAccessibility,
+  handleKeyboardNavigation,
+  announceScreenChange,
+  announceListUpdate,
+  announceActionResult,
+  getEnhancedMapMarkerAccessibility,
+  useReducedMotion,
+  useHighContrast,
+  ACCESSIBILITY_ROLES,
+  ACCESSIBILITY_TRAITS,
 };
